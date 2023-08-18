@@ -1,0 +1,79 @@
+#version 440 core
+#define BRIGHTNESS 0.05
+#define CONTRAST 1.28
+#define SATURATION 1.19
+#define VIGNETTE_DISTANCE 0.1
+#define VIGNETTE_FALLOFF 3.8
+#define VIGNETTE_ALPHA 1.0
+
+layout(rgba16f, binding = 0) uniform readonly image2D inputImage;
+layout(rgba16f, binding = 1) uniform writeonly image2D outputImage;
+
+layout(std140, binding = 4) uniform lightingInfo{
+    vec3 sunDirection;
+    vec3 moonDirection;
+    vec3 activeLightDirection;
+    vec3 sunColor;
+    vec3 moonColor;
+    float dayNightCycle;
+    float activeShadowStrength;
+    float activeShadowBackLeftStrength;
+    float activeShadowOffset;
+    float activeShadowBackLeftOffset;
+    float lightExposure;
+    float lightColorSaturation;
+};
+
+vec3 aces_tonemap(vec3 color, float exposure);
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    //vec2 texelSize = vec2(1.0 / windowX, 1.0 / windowY);
+    //vec2 texCoord = vec2(texelCoord) * texelSize;
+
+    vec3 baseColor = imageLoad(inputImage, texelCoord).rgb;
+
+    //brightness/contrast
+    baseColor = (vec3(CONTRAST) * (baseColor - vec3(0.5))) + vec3(0.5) + vec3(BRIGHTNESS);
+
+    //saturation
+    float luminance = dot(baseColor, vec3(0.2126, 0.7152, 0.0722));
+    baseColor = mix(vec3(luminance), baseColor, SATURATION);
+
+    //tonemapping
+    baseColor = aces_tonemap(baseColor, lightExposure);
+
+    //gamma correction
+    //baseColor = pow(baseColor, vec3(1.5));
+
+    //vignette
+    /*
+    float aspect = float(windowX) / float(windowY);
+    float vx = min(VIGNETTE_DISTANCE, VIGNETTE_DISTANCE / aspect);
+    float vy = min(VIGNETTE_DISTANCE, VIGNETTE_DISTANCE * aspect);
+    float xAmt = max(0.0, max(vx - texCoord.x, texCoord.x - 1.0 + vx)) * max(1.0, aspect);
+    float yAmt = max(0.0, max(vy - texCoord.y, texCoord.y - 1.0 + vy)) * max(1.0, 1.0 / aspect);
+    baseColor *= 1.0 - VIGNETTE_ALPHA * pow(clamp(VIGNETTE_FALLOFF * length(vec2(xAmt, yAmt)), 0.0, 1.0), 3.0);*/
+
+    imageStore(outputImage, texelCoord, vec4(baseColor, 1.0));
+}
+
+// Based on http://www.oscars.org/science-technology/sci-tech-projects/aces
+vec3 aces_tonemap(vec3 color, float exposure){	
+	mat3 m1 = mat3(
+        0.59719, 0.07600, 0.02840,
+        0.35458, 0.90834, 0.13383,
+        0.04823, 0.01566, 0.83777
+	);
+	mat3 m2 = mat3(
+        1.60475, -0.10208, -0.00327,
+        -0.53108,  1.10813, -0.07276,
+        -0.07367, -0.00605,  1.07602
+	);
+	vec3 v = m1 * color * exposure;    
+	vec3 a = v * (v + 0.0245786) - 0.000090537;
+	vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
+	return clamp(m2 * (a / b), 0.0, 1.0);
+}

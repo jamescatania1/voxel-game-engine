@@ -1,0 +1,51 @@
+#version 440
+
+uniform sampler2D inputTexture;
+layout(rgba16f) uniform writeonly image2D outputImage;
+
+uniform vec2 outputSize;
+uniform bool isBaseMip;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+void main()
+{
+    vec4 value = vec4(0.0, 0.0, 0.0, 1.0);
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    float dx = 1.0 / (outputSize.x);
+    float dy = 1.0 / (outputSize.y);
+
+    float x = float(texelCoord.x) * dx + 0.5 * dx;
+    float y = float(texelCoord.y) * dy + 0.5 * dy;
+
+    vec3 a_11 = texture(inputTexture, vec2(x - 2.0 * dx, y + 2.0 * dy)).rgb;
+    vec3 a_12 = texture(inputTexture, vec2(x, y + 2.0 * dy)).rgb;
+    vec3 a_13 = texture(inputTexture, vec2(x + 2.0 * dx, y + 2.0 * dy)).rgb;
+    vec3 a_21 = texture(inputTexture, vec2(x - 2.0 * dx, y)).rgb;
+    vec3 a_22 = texture(inputTexture, vec2(x, y)).rgb;
+    vec3 a_23 = texture(inputTexture, vec2(x + 2.0 * dx, y)).rgb;
+    vec3 a_31 = texture(inputTexture, vec2(x - 2.0 * dx, y - 2.0 * dy)).rgb;
+    vec3 a_32 = texture(inputTexture, vec2(x, y - 2.0 * dy)).rgb;
+    vec3 a_33 = texture(inputTexture, vec2(x + 2.0 * dx, y - 2.0 * dy)).rgb;
+
+    vec3 b_11 = texture(inputTexture, vec2(x - dx, y + dy)).rgb;
+    vec3 b_12 = texture(inputTexture, vec2(x + dx, y + dy)).rgb;
+    vec3 b_21 = texture(inputTexture, vec2(x - dx, y - dy)).rgb;
+    vec3 b_22 = texture(inputTexture, vec2(x + dx, y - dy)).rgb;
+
+    vec3 smoothed;
+    if(isBaseMip){
+        //perform karis average
+        //float luminance = dot(baseColor, vec3(0.2126, 0.7152, 0.0722));
+        smoothed = (a_11 + a_13 + a_31 + a_33) * 0.03125 + (a_12 + a_21 + a_23 + a_32) * 0.0625 + a_22 * 0.125 + (b_11 + b_12 + b_21 + b_22) * 0.125;
+        float brightness = max(smoothed.x, max(smoothed.y, smoothed.z));
+        float contribution = max(0.0, brightness - 3.06) / max(brightness, 0.000001);
+        smoothed *= contribution;
+    }
+    else {
+        smoothed = (a_11 + a_13 + a_31 + a_33) * 0.03125 + (a_12 + a_21 + a_23 + a_32) * 0.0625 + a_22 * 0.125 + (b_11 + b_12 + b_21 + b_22) * 0.125;
+    }
+    value = vec4(smoothed, 1.0);
+
+    imageStore(outputImage, texelCoord, value);
+}

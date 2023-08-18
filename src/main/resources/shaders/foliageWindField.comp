@@ -1,0 +1,18 @@
+#version 440
+
+uniform sampler2D windOffsets;
+layout(r16f) uniform writeonly image2D outputImage;
+
+layout(std140, binding = 6) uniform globalData{
+    float programTime;
+    float gameTime;
+};
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    float offset = texture(windOffsets, vec2(texelCoord) / textureSize(windOffsets, 0).x).r;
+    float value = sin(programTime * 1.75 + offset);
+    imageStore(outputImage, texelCoord, vec4(value, 0.0, 0.0, 0.0));
+}

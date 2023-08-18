@@ -1,0 +1,43 @@
+#version 440
+
+uniform sampler2D inputTexture;
+layout(rgba16f) uniform image2D outputImage;
+
+uniform vec2 outputSize;
+uniform bool isBaseMip;
+uniform float radius;
+uniform float intensity;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    float dx = 2.0 / (outputSize.x);
+    float dy = 2.0 / (outputSize.y);
+
+    float x = float(texelCoord.x) / outputSize.x;
+    float y = float(texelCoord.y) / outputSize.y;
+
+    vec3 a_11 = texture(inputTexture, vec2(x - dx, y + dy)).rgb;
+    vec3 a_12 = texture(inputTexture, vec2(x, y + dy)).rgb;
+    vec3 a_13 = texture(inputTexture, vec2(x + dx, y + dy)).rgb;
+    vec3 a_21 = texture(inputTexture, vec2(x - dx, y)).rgb;
+    vec3 a_22 = texture(inputTexture, vec2(x, y)).rgb;
+    vec3 a_23 = texture(inputTexture, vec2(x + dx, y)).rgb;
+    vec3 a_31 = texture(inputTexture, vec2(x - dx, y - dy)).rgb;
+    vec3 a_32 = texture(inputTexture, vec2(x, y - dy)).rgb;
+    vec3 a_33 = texture(inputTexture, vec2(x + dx, y - dy)).rgb;
+
+    vec3 smoothed = (a_11 + a_13 + a_31 + a_33) * 0.0625 + (a_12 + a_21 + a_23 + a_32) * 0.125 + a_22 * 0.25;
+
+    vec4 value = imageLoad(outputImage, texelCoord);
+    if(isBaseMip){
+        value += intensity * vec4(smoothed, 1.0);
+    }
+    else{
+        value += radius * vec4(smoothed, 1.0);
+    }
+
+    imageStore(outputImage, texelCoord, value);
+}

@@ -1,0 +1,44 @@
+#version 440 core
+
+/**
+ * This uses discrete gaussian approximation for a 13x13 kernel
+ * it is computed with bilinear filtering, offsetting the samples
+ * outside the center such that they obtain the bilinear (average) of the
+ * two neighbors.
+ * The blur is applied in two directions, such that the entire pass takes
+ * only 12 texture samples per pixel.
+ *
+ * In my use, I first downscale the image to half size, apply the mentioned
+ * blur, and then upscale with a simple 3x3 tent filter in my final mix (fx.frag).
+ * So, the tent filter only has be computed for parts of the screen I want to show
+ * the blurred portion on.
+ * Worst case: O(12xy) texture lookups.
+ */
+
+uniform sampler2D inputTexture;
+layout(rgba16f) uniform writeonly image2D outputImage;
+
+layout(std140, binding = 0) uniform windowInfo{
+    int windowX;
+    int windowY;
+};
+
+uniform vec2 direction;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+void main()
+{
+    ivec2 texelCoord = ivec2(gl_GlobalInvocationID.xy);
+    vec2 texelSize = 2.0 / vec2(windowX, windowY);
+    vec2 texCoord = (vec2(texelCoord) * texelSize + 0.5 * texelSize);
+
+    vec3 color = texture(inputTexture, texCoord).rgb * 0.1964825501511404;
+    color += texture(inputTexture, texCoord + direction * texelSize * 1.411764705882353).rgb * 0.2969069646728344;
+    color += texture(inputTexture, texCoord - direction * texelSize * 1.411764705882353).rgb * 0.2969069646728344;
+    color += texture(inputTexture, texCoord + direction * texelSize * 3.2941176470588234).rgb * 0.09447039785044732;
+    color += texture(inputTexture, texCoord - direction * texelSize * 3.2941176470588234).rgb * 0.09447039785044732;
+    color += texture(inputTexture, texCoord + direction * texelSize * 5.176470588235294).rgb * 0.010381362401148057;
+    color += texture(inputTexture, texCoord - direction * texelSize * 5.176470588235294).rgb * 0.010381362401148057;
+
+    imageStore(outputImage, texelCoord, vec4(color, 1.0));
+}
