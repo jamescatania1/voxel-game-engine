@@ -19,7 +19,7 @@ I wanted to create an engine that could handle an ode to the casual simulation g
 
 The model in the center is modified from the default MagicaVoxel "monu2" model. It is a placeholder, like everything else.
 
-The scene shown is at 800x800 with 4xMSAA and 4096x4096 shadows. I'm running an RTX 3080 12GB and i5-12400.
+The scene shown is at 800x800 with 4xMSAA and 4096x4096 shadows. I'm running Intel UHD graphics and a laptop i7. I achieve frame times under 1ms (>1000FPS) with an RTX 3080 at 1920x1080.
 #
 ![Screenshot](screenshot_03.jpg)
 ![Screenshot](screenshot_01.jpg)
